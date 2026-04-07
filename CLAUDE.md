@@ -93,6 +93,8 @@ When creating a **conversational** (multi-turn, WebSocket-based) low-code agent,
   For example: `node C:/repo/cli/packages/cli/dist/index.js agent list`
   Check to make sure the repo is buitl and the binaries are available, if not, ask users to clone and build the repo
 
+- The `uip` CLI requires authentication via `uip login`, which would allow user to sign into the right organization. It is also important to switch to the right tenant using `uip login -t <tenantName>` command. Let user know the current tenant after login and confirm with user that the correct tenant is in use before publishing changes to UiPath Automation Cloud.
+
 ## Initial Deploy (first time — push → publish → deploy)
 
 Use this workflow when deploying a **new** agent for the first time. The solution folder must be placed under the `Shared` root folder with a name matching the project name (e.g. `Shared/MyAgent`).

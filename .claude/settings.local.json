@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:uipath.github.io)",
+      "Bash(uipath:*)",
+      "Bash(uip:*)",
+      "Bash(node:*)"
+    ]
+  }
+}

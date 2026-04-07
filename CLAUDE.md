@@ -84,6 +84,133 @@ When creating a **conversational** (multi-turn, WebSocket-based) low-code agent,
 }
 ```
 
+## UiPath TypeScript SDK — Frontend Integration Guide
+
+### Package & Imports
+
+```
+npm install @uipath/uipath-typescript
+```
+```typescript
+import { UiPath } from '@uipath/uipath-typescript/core';
+import { ConversationalAgent } from '@uipath/uipath-typescript/conversational-agent';
+```
+
+### OAuth / PKCE Setup
+
+Create a **Non-Confidential External Application** in UiPath Cloud Admin with:
+- **Redirect URI:** `http://localhost:5173/callback` (or your app's origin + `/callback`)
+- **Scopes:** `OR.Default`, `Traces.Api`, `ConversationalAgents`
+
+SDK constructor:
+```typescript
+const sdk = new UiPath({
+  baseUrl: 'https://cloud.uipath.com',
+  orgName: 'your-org',
+  tenantName: 'your-tenant',
+  clientId: 'your-client-id',
+  redirectUri: window.location.origin + '/callback',
+  scope: 'OR.Default Traces.Api ConversationalAgents',
+});
+```
+
+**`sdk.initialize()` handles the entire PKCE flow** — both the initial redirect to the login page AND completing the callback when `code=` is in the URL. Do NOT manually call `isInOAuthCallback()` / `completeOAuth()` — just call `await sdk.initialize()` and let it handle everything.
+
+After `initialize()` returns, clean up the URL and check `sdk.isAuthenticated()`.
+
+On first load (no token), `initialize()` will redirect the browser. On the callback page (with `code=`), `initialize()` exchanges the code for a token and returns. On subsequent loads (token cached), `initialize()` returns immediately.
+
+**Important:** Only auto-call `initialize()` on mount if the URL contains a callback (`code=` param or `/callback` path). Otherwise, wait for a user action (button click) to avoid unwanted redirects.
+
+### WebSocket Session — Correct Initialization
+
+**Use `agentService.conversations.startSession(conversationId)`, NOT `conversation.startSession()`.** The bound method on the conversation object may not wire up the WebSocket event dispatch correctly. The service method is the reliable path.
+
+```typescript
+const agentService = new ConversationalAgent(sdk);
+const agents = await agentService.getAll();
+const agent = agents.find(a => a.name === 'MyAgent');
+const conversation = await agent.conversations.create({ label: 'Chat' });
+const conversationId = conversation.id ?? conversation.conversationId;
+
+// Use the SERVICE method — not conversation.startSession()
+const session = agentService.conversations.startSession(conversationId);
+```
+
+The SDK uses **Socket.IO** over WebSocket internally (`wss://cloud.uipath.com/autopilotforeveryone_/websocket_/socket.io`). You do not manage the WebSocket directly.
+
+### Event Handling — Streaming Responses
+
+The event hierarchy is: **Session → Exchange → Message → ContentPart → Chunk**
+
+**Critical:** Register `onExchangeStart` on the session for server-initiated events, but ALSO attach handlers directly on the exchange returned by `startExchange()`. The `onExchangeStart` session handler may not fire for client-initiated exchanges.
+
+```typescript
+// During init — register session-level handler
+session.onExchangeStart((exchange) => {
+  attachResponseHandlers(exchange);
+});
+
+session.onSessionStarted(() => { /* mark ready */ });
+
+// When sending a message — attach handlers on the exchange directly
+const exchange = session.startExchange();
+attachResponseHandlers(exchange);  // belt-and-suspenders
+await exchange.sendMessageWithContentPart({ data: userText });
+```
+
+The response handler drills into the nested event stream:
+```typescript
+function attachResponseHandlers(exchange) {
+  exchange.onMessageStart((message) => {
+    if (message.isAssistant) {
+      // Create an empty assistant message in UI state
+
+      message.onContentPartStart((part) => {
+        part.onChunk((chunk) => {
+          // Append chunk.data to the assistant message (streaming)
+        });
+      });
+
+      message.onCompleted(() => {
+        // Mark message as done streaming
+      });
+    }
+  });
+
+  exchange.onExchangeEnd(() => {
+    // Reset streaming state, re-enable input
+  });
+}
+```
+
+### React Streaming UI Pattern
+
+For React, accumulate chunks into state:
+```typescript
+// On exchange start: add empty message to state with streaming: true
+// On each chunk: update that message's content by appending chunk.data
+// On message completed / exchange end: set streaming: false, re-enable Send button
+```
+
+Use `message.isAssistant` to filter — `onMessageStart` fires for both user (echo) and assistant messages.
+
+### Cleanup
+
+```typescript
+// End session on unmount
+agentService.conversations.endSession(conversationId);
+```
+
+### Connection Monitoring
+
+```typescript
+agentService.onConnectionStatusChanged((status, error) => {
+  // status: 'Connecting' | 'Connected' | 'Disconnected'
+  // Show connection indicator in UI
+});
+```
+
 ## UiPath CLI (`uip`) Notes
 
 - The `uip` CLI is built from source at $UIPATH_CLI_REPO. Instead of the global `uip` command, always use:

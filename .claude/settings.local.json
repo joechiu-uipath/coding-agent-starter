@@ -4,6 +4,8 @@
       "WebFetch(domain:uipath.github.io)",
       "Bash(uipath:*)",
       "Bash(uip:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
       "Bash(node:*)"
     ]
   }

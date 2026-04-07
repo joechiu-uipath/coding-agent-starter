@@ -1,5 +1,10 @@
 # Project Notes
 
+## Required Parameters:
+Ask if these are not set, ask user to specify them:
+$UIPATH_CLI_REPO = C:\repo\cli
+
+
 ## UiPath Low-Code Conversational Agent Checklist
 
 Include @uipath/cli npm package as dev dependency
@@ -81,33 +86,66 @@ When creating a **conversational** (multi-turn, WebSocket-based) low-code agent,
 
 ## UiPath CLI (`uip`) Notes
 
-- The `uip` CLI is built from source at `C:\repo\cli`. Instead of the global `uip` command, always use:
+- The `uip` CLI is built from source at $UIPATH_CLI_REPO. Instead of the global `uip` command, always use:
   ```
-  node C:/repo/cli/packages/cli/dist/index.js <command>
+  node $UIPATH_CLI_REPO/packages/cli/dist/index.js <command>
   ```
   For example: `node C:/repo/cli/packages/cli/dist/index.js agent list`
-- `uip agent publish` is currently broken locally due to a `@uipath/solution-tool` bug — see `bug.md` for details. Workaround: use `uip agent push` + publish/deploy from Studio Web UI.
-- `uip agent push --overwrite <solutionId>` updates an existing Studio Web project incrementally.
-- PirateRecruiter solution ID (DefaultTenant): `6d6239a8-b8ba-40dd-7902-08de91627877`
-- PirateRecruiter cloud project ID: `df790aea-362d-4b72-92ef-f3b20710fc40`
+  Check to make sure the repo is buitl and the binaries are available, if not, ask users to clone and build the repo
 
-## Agent Iteration Workflow (edit → push → publish → upgrade)
+## Initial Deploy (first time — push → publish → deploy)
 
-When iterating on an already-deployed agent, use this sequence:
+Use this workflow when deploying a **new** agent for the first time. The solution folder must be placed under the `Shared` root folder with a name matching the project name (e.g. `Shared/MyAgent`).
+
+### 1. Push to Studio Web (creates the solution)
+```
+uip agent push --name <project-name>
+```
+This creates a new solution in Studio Web and returns a `SolutionId`. Save this — you'll need it for subsequent iterations.
+
+### 2. Publish to Orchestrator feed
+```
+uip agent publish --package-version 1.0.1
+```
+Do NOT use `--direct` — that bypasses solution deployment and creates duplicate processes.
+
+### 3. Deploy with `solution deploy run` (NOT `agent deploy`)
+`agent deploy` does NOT support `--folder-path` / `--folder-name`, so the solution folder lands in a generic `solution_folder`. Use `solution deploy run` instead:
+```
+uip solution deploy run \
+  --name <project-name> \
+  --package-name <project-name> \
+  --package-version 1.0.1 \
+  --folder-path Shared \
+  --folder-name <project-name>
+```
+This places the deployment at `Shared/<project-name>`.
+
+### 4. Rename the process (workaround for "Agent" default name)
+The solution packager hardcodes the project folder as `Agent/`, so the process display name is always "Agent". Rename it:
+```
+uip or processes edit <process-key> --name <project-name> --retention-period 30 --retention-action Delete
+```
+The `--retention-period` and `--retention-action` flags are required to work around a CLI bug where the PATCH request fails with "Invalid argument 'Period'" if they are omitted. Get the process key from `uip or processes list --folder-key <folder-key>`.
+
+## Subsequent Iterations (edit → push → publish → upgrade)
+
+Use this workflow when updating an **already-deployed** agent.
 
 ### 1. Edit agent.json locally
 Make changes to `<AgentDir>/Agent/agent.json` (system prompt, settings, etc.)
 
-### 2. Push to Studio Web
+### 2. Push update to Studio Web
 ```
 uip agent push --overwrite <solutionId>
 ```
+Uses `--overwrite` with the existing solution ID (from the initial push) to update in-place.
 
-### 3. Publish to Orchestrator feed (increment version)
+### 3. Publish new version to Orchestrator feed
 ```
 uip agent publish --package-version <X.Y.Z>
 ```
-Do NOT use `--direct` — that bypasses solution deployment and creates duplicate processes.
+Increment the version each time.
 
 ### 4. Upgrade the solution deployment in-place
 ```
@@ -115,19 +153,32 @@ uip solution deploy run \
   --name <deployment-name> \
   --package-name <package-name> \
   --package-version <X.Y.Z> \
-  --folder-path <parent-folder> \
+  --folder-path Shared \
   --folder-name <solution-folder-name>
 ```
-This upgrades the existing deployment to the new version. Using the same `--name` as the existing deployment performs an in-place upgrade (not a new deployment).
+Using the same `--name` as the existing deployment performs an in-place upgrade (not a new deployment).
 
-### 5. Rename the process (workaround for "Agent" default name)
-The solution packager hardcodes the project folder as `Agent/`, so the process display name always resets to "Agent" after each deploy. Rename it back:
+### 5. Rename the process again
+The process name resets to "Agent" after each deploy. Rename it back:
 ```
 uip or processes edit <process-key> --name <desired-name> --retention-period 30 --retention-action Delete
 ```
-The `--retention-period` and `--retention-action` flags are required to work around a CLI bug where the PATCH request fails with "Invalid argument 'Period'" if they are omitted. Get the process key from `uip or processes list --folder-key <folder-key>`.
 
-### Example for PirateAgent742
+## Important notes
+- The `Agent/` project folder name **cannot** be renamed — the solution packager (`@uipath/solution-sdk`) hardcodes it. This is why the process name defaults to "Agent" and must be renamed after each deploy.
+- `agent deploy` does NOT support folder placement options — always use `solution deploy run` with `--folder-path Shared --folder-name <project-name>`.
+- The initial push uses `uip agent push --name <name>` (no `--overwrite`). Subsequent pushes use `uip agent push --overwrite <solutionId>`.
+
+### Example: PirateAgent742
+
+**Initial deploy:**
+```
+uip agent push --name PirateAgent742
+uip agent publish --package-version 1.0.1
+uip solution deploy run --name PirateAgent742 --package-name PirateAgent742 --package-version 1.0.1 --folder-path Shared --folder-name PirateAgent742
+uip or processes edit <process-key> --name PirateAgent742 --retention-period 30 --retention-action Delete
+```
+**Subsequent iteration:**
 ```
 uip agent push --overwrite 8dea8f41-ecc3-464d-7d7a-08de91627877
 uip agent publish --package-version 1.0.12
@@ -136,12 +187,23 @@ uip or processes edit <process-key> --name PirateAgent742 --retention-period 30 
 ```
 To get the process key: `uip or processes list --folder-key 7c7b8df5-e1a2-4c3f-92c6-5d3f76542c84`
 
-### Important notes
-- The `Agent/` project folder name **cannot** be renamed — the solution packager (`@uipath/solution-sdk`) hardcodes it. This is why the process name defaults to "Agent" and must be renamed after each deploy.
-- `agent deploy` only works for **first-time deployment** to create the solution folder. For subsequent updates, use `solution deploy run` with the same deployment name.
 - PirateAgent742 solution ID: `8dea8f41-ecc3-464d-7d7a-08de91627877`
 - PirateAgent742 deployment name: `PirateAgent742`
 - PirateAgent742 folder: `Shared/PirateAgent742` (key: `7c7b8df5-e1a2-4c3f-92c6-5d3f76542c84`, ID: `753649`)
+
+### Example: PirateAgent531
+
+**Subsequent iteration** (already deployed):
+```
+uip agent push --overwrite 9af17820-a06c-4b06-ac68-08de948bbc62
+uip agent publish --package-version <X.Y.Z>
+uip solution deploy run --name PirateAgent531 --package-name PirateAgent531 --package-version <X.Y.Z> --folder-path Shared --folder-name PirateAgent531
+uip or processes edit 5B0B4633-3C76-40FB-BD59-B1EC7198C4C2 --name PirateAgent531 --retention-period 30 --retention-action Delete
+```
+- PirateAgent531 solution ID: `9af17820-a06c-4b06-ac68-08de948bbc62`
+- PirateAgent531 deployment name: `PirateAgent531`
+- PirateAgent531 folder: `Shared/PirateAgent531` (key: `4ffb7d79-2d06-457e-a8db-869d2845b73a`, ID: `753898`)
+- PirateAgent531 process key: `5B0B4633-3C76-40FB-BD59-B1EC7198C4C2`
 
 ## Another CLI (`uipath`) Notes
 

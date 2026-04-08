@@ -8,7 +8,16 @@
       "Bash(npx:*)",
       "Bash(node:*)",
       "Bash(curl:*)",
-      "Read(//tmp/**)"
+      "Bash(sed:*)",
+      "Bash(sleep:*)",
+      "Read(//tmp/**)",
+      "Bash(where:*)",
+      "Bash(source:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(export:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(python:*)",
+      "mcp__chrome-devtools__*"
     ]
   }
 }

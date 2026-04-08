@@ -99,7 +99,7 @@ import { ConversationalAgent } from '@uipath/uipath-typescript/conversational-ag
 ### OAuth / PKCE Setup
 
 Create a **Non-Confidential External Application** in UiPath Cloud Admin with:
-- **Redirect URI:** `http://localhost:5173/callback` (or your app's origin + `/callback`)
+- **Redirect URI:** The app's base URL (e.g. `http://localhost:5173` for dev, `https://<org>.uipath.host/<app-name>` for deployed). Do NOT use `/callback` sub-paths — UiPath Coded Apps hosting doesn't support SPA routing.
 - **Scopes:** `OR.Default`, `Traces.Api`, `ConversationalAgents`
 
 SDK constructor:
@@ -109,7 +109,7 @@ const sdk = new UiPath({
   orgName: 'your-org',
   tenantName: 'your-tenant',
   clientId: 'your-client-id',
-  redirectUri: window.location.origin + '/callback',
+  redirectUri: window.location.href.split('?')[0].split('#')[0].replace(/\/$/, ''),
   scope: 'OR.Default Traces.Api ConversationalAgents',
 });
 ```
@@ -120,7 +120,7 @@ After `initialize()` returns, clean up the URL and check `sdk.isAuthenticated()`
 
 On first load (no token), `initialize()` will redirect the browser. On the callback page (with `code=`), `initialize()` exchanges the code for a token and returns. On subsequent loads (token cached), `initialize()` returns immediately.
 
-**Important:** Only auto-call `initialize()` on mount if the URL contains a callback (`code=` param or `/callback` path). Otherwise, wait for a user action (button click) to avoid unwanted redirects.
+**Important:** Only auto-call `initialize()` on mount if the URL contains a `code=` query parameter. Otherwise, wait for a user action (button click) to avoid unwanted redirects.
 
 ### WebSocket Session — Correct Initialization
 
@@ -333,6 +333,63 @@ uip or processes edit 5B0B4633-3C76-40FB-BD59-B1EC7198C4C2 --name PirateAgent531
 - PirateAgent531 deployment name: `PirateAgent531`
 - PirateAgent531 folder: `Shared/PirateAgent531` (key: `4ffb7d79-2d06-457e-a8db-869d2845b73a`, ID: `753898`)
 - PirateAgent531 process key: `5B0B4633-3C76-40FB-BD59-B1EC7198C4C2`
+
+## UiPath Coded Apps — Critical Deployment Notes
+
+### CDN CORS Issue — MUST inline all assets
+UiPath Coded Apps hosting serves HTML from `*.uipath.host` but loads CSS/JS assets from the Azure CDN (`uipath-apps-prd.azureedge.net`). The CDN does **not** set `Access-Control-Allow-Origin` headers, so `<script type="module">` and `<link>` cross-origin requests are **blocked by CORS**.
+
+**Fix:** Use `vite-plugin-singlefile` to inline all JS/CSS into a single `index.html`:
+```bash
+npm install vite-plugin-singlefile --save-dev
+```
+```typescript
+// vite.config.ts
+import { viteSingleFile } from 'vite-plugin-singlefile'
+
+export default defineConfig({
+  plugins: [react(), viteSingleFile()],
+  build: {
+    cssCodeSplit: false,
+    assetsInlineLimit: Infinity,
+  },
+})
+```
+
+### No SPA routing — redirect URI must be the app base URL
+UiPath Coded Apps hosting does **not** support SPA sub-route fallback. Navigating to `/app-name/callback` returns `{"error":"Not found","message":"App metadata not found"}`.
+
+**Fix:** Use the app's base URL as the OAuth redirect URI, NOT a `/callback` sub-path:
+- Deployed: `https://<org>.uipath.host/<app-name>` 
+- Local dev: `http://localhost:5173`
+- Detect OAuth callback via `url.searchParams.has('code')`, not by pathname
+- Register these exact URIs in the External Application (UiPath Cloud Admin)
+
+```typescript
+// Correct — uses current page URL as redirect URI
+redirectUri: window.location.href.split('?')[0].split('#')[0].replace(/\/$/, '')
+
+// WRONG — /callback sub-route will 404 on UiPath hosting
+redirectUri: window.location.origin + '/callback'
+```
+
+### Coded App deploy pipeline
+```bash
+npm run build
+uip codedapp pack dist -n <app-name> --version <X.Y.Z> --reuse-client
+uip codedapp publish -n <app-name> --version <X.Y.Z>
+UIPATH_FOLDER_KEY=<folder-key> uip codedapp deploy -n <app-name>
+```
+
+- **`--reuse-client`** on pack: reuses the OAuth client ID from `uipath.json` instead of creating a new one each time
+- **`UIPATH_FOLDER_KEY` env var**: the `--folder-key` CLI flag is ignored by `codedapp deploy`; use the env var instead
+- **`uipath.json`**: created by first `pack`, contains OAuth client config. Fill in `clientId`, `scope`, `orgName`, `tenantName`, `baseUrl` before re-packing with `--reuse-client`
+
+### Tool call data may be objects, not strings
+When handling `onToolCallStart` events from the UiPath SDK, `toolCall.startEvent.input` and `toolCall.onToolCallEnd(end => end.output)` may be **objects**, not strings. Always stringify before rendering in React to avoid "Objects are not valid as a React child" errors:
+```typescript
+const inputStr = typeof toolInput === 'string' ? toolInput : JSON.stringify(toolInput ?? {});
+```
 
 ## Another CLI (`uipath`) Notes
 

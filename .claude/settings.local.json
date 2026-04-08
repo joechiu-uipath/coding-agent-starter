@@ -17,7 +17,8 @@
       "Bash(export:*)",
       "Bash(powershell.exe:*)",
       "Bash(python:*)",
-      "mcp__chrome-devtools__*"
+      "mcp__chrome-devtools__*",
+      "Bash(ls:*)"
     ]
   }
 }

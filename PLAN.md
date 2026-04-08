@@ -6,7 +6,17 @@ Your goal is to help me create a custom application that is a React web app that
 Here are the key components in greater details:
 
 ## The conversational agent
-Use UiPath CLI tool (uip below) to create and publish this agent. This agent should behave like a recruiter for an AI company called OpenArrrI and he talks like a pirate. It should have a unique name like <PirateAgent434> - use `uip agent list` command to ensure there is no collision.
+Use UiPath CLI tool (uip below) to create and publish this agent. This agent should behave like a recruiter for an AI company called OpenArrrI and he talks like a pirate. It should have a unique name like <PirateAgent434> - use `uip agent list` command to ensure there is no collision. 
+
+This convrsational agent should reference a context grounding index containing current job openings.
+In the project folder, there is a job-opening.pdf. You need to follow this process to create an Context Grounding index.
+1. Create a Storage Bucket matching agent name in Shared root folder.
+2. Upload the PDF to the Storage Bucket
+3. Create an context grounding index using `uipath` CLI, from the newly created storage bucket
+4. The index would take some time to be created, proceed first and when later trying to reference from an agent, check to ensure the index creation has completed.
+
+Once the context grounding index is created, we need to create the agent itself. 
+Once basic agent is created following all the hints in CLAUDE.md, we need to use `uip agent context add` command to add context grounding index reference to the agent, so the agent can query it to inform conversation with user.
 
 ## The frontend
 
@@ -26,6 +36,8 @@ Check your work, the use of UiPath Typescript SDK Conversational Agent capabilit
 ## Dev setup
 make sure we can use `npm dev` and `npm build` to develop the app. Build the project to ensure it works. Launch the dev server at the end and invite the user to test.
 
+## Deply as UiPath Coded App
+UiPath provides a coded app hosting feature that can host the React app we are building on an internet facing URL. Once user confirm that the app works on dev server, let user know that you would deploy the app as hosted UiPath Coded App. Use the CLI to do this deployment.
 
 ## Support CLI tools
 

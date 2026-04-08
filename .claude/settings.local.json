@@ -6,7 +6,9 @@
       "Bash(uip:*)",
       "Bash(npm:*)",
       "Bash(npx:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Read(//tmp/**)"
     ]
   }
 }

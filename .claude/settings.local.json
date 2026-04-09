@@ -16,9 +16,12 @@
       "Bash(cmd.exe:*)",
       "Bash(export:*)",
       "Bash(powershell.exe:*)",
+      "Bash(pip:*)",
       "Bash(python:*)",
       "mcp__chrome-devtools__*",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(UIPATH_FOLDER_KEY=* node:*)",
+      "Bash(UIPATH_FOLDER_PATH=* uipath:*)"
     ]
   }
 }

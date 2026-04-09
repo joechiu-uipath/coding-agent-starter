@@ -12,8 +12,11 @@ Ask Claude Code to `execute PLAN.md` and follow any prompt for info, and the cod
   - ConversationalAgents: ConversationalAgents
 
 ## PLAN.md
-Take a look to understand the scenario that we will be building. We will show building a simple but meaningful agent-powered application.
+This file contains the customer's specification of what they want to build. Take a look to understand the scenario that we will be building. We will show building a simple but meaningful agent-powered application.
 
 ## CLAUDE.md
 Contains instructions helpful for first time success for building agent powered UiPath apps using coding agent. 
 
+## settings.local.json
+
+We pre-approved many commands that we expect to be needed to run during this demo. This is done to streamline the flow of the demo, so it doesn't require constant approvals. You should not take this file AS-IS for your actual projects.

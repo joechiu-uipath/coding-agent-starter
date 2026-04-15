@@ -10,6 +10,7 @@ Ask Claude Code to `execute PLAN.md` and follow any prompt for info, and the cod
   - UiPath.Orchestrator: OR.Execution OR.Folders OR.Jobs OR.Users
   - Traces.Api: Traces.Api
   - ConversationalAgents: ConversationalAgents
+- redirect URL: http://localhost:5173 for dev server (the coding agent should use `window.location.href.split('?')[0].split('#')[0].replace(/\/$/, '')` to derive the redirect URL. If you later deploy to Coded App, you would need to add the corresponding Coded APP URL to the redirect URL. Coding agent should be able to tell you what is the redirect URL to add to your config. (you can have many valid redirect URLs for each external application entry).
 
 ## PLAN.md
 Take a look to understand the scenario that we will be building. We will show building a simple but meaningful agent-powered application.
